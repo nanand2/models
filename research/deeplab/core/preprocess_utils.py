@@ -117,6 +117,68 @@ def pad_to_bounding_box(image, offset_height, offset_width, target_height,
   return padded + pad_value
 
 
+
+
+def stack_pad_to_bounding_box(image, offset_height, offset_width, target_height,
+                        target_width, pad_value):
+  """Pads the given image with the given pad_value.
+
+  Works like tf.image.pad_to_bounding_box, except it can pad the image
+  with any given arbitrary pad value and also handle images whose sizes are not
+  known during graph construction.
+
+  Args:
+    image: 3-D tensor with shape [height, width, channels]
+    offset_height: Number of rows of zeros to add on top.
+    offset_width: Number of columns of zeros to add on the left.
+    target_height: Height of output image.
+    target_width: Width of output image.
+    pad_value: Value to pad the image tensor with.
+
+  Returns:
+    3-D tensor of shape [target_height, target_width, channels].
+
+  Raises:
+    ValueError: If the shape of image is incompatible with the offset_* or
+    target_* arguments.
+  """
+  image_rank = tf.rank(image)
+  image_rank_assert = tf.Assert(
+      tf.equal(image_rank, 4),
+      ['Wrong image tensor rank [Expected] [Actual]',
+       4, image_rank])
+  with tf.control_dependencies([image_rank_assert]):
+    image -= pad_value
+  image_shape = tf.shape(image)
+  height, width = image_shape[1], image_shape[2]
+  target_width_assert = tf.Assert(
+      tf.greater_equal(
+          target_width, width),
+      ['target_width must be >= width'])
+  target_height_assert = tf.Assert(
+      tf.greater_equal(target_height, height),
+      ['target_height must be >= height'])
+  with tf.control_dependencies([target_width_assert]):
+    after_padding_width = target_width - offset_width - width
+  with tf.control_dependencies([target_height_assert]):
+    after_padding_height = target_height - offset_height - height
+  offset_assert = tf.Assert(
+      tf.logical_and(
+          tf.greater_equal(after_padding_width, 0),
+          tf.greater_equal(after_padding_height, 0)),
+      ['target size not possible with the given target offsets'])
+
+  height_params = tf.stack([offset_height, after_padding_height])
+  width_params = tf.stack([offset_width, after_padding_width])
+  channel_params = tf.stack([0, 0])
+  depth_params = tf.stack([0, 0])
+
+  with tf.control_dependencies([offset_assert]):
+    paddings = tf.stack([depth_params, height_params, width_params, channel_params])
+  padded = tf.pad(image, paddings)
+  return padded + pad_value
+
+
 def _crop(image, offset_height, offset_width, crop_height, crop_width):
   """Crops the given image using the provided offsets and sizes.
 
@@ -434,6 +496,109 @@ def resize_to_range(image,
         resized_label = tf.image.resize_nearest_neighbor(
             resized_label, new_size, align_corners=align_corners)
         resized_label = tf.squeeze(resized_label, 3)
+      else:
+        # Input label has shape [height, width, channel].
+        resized_label = tf.image.resize_images(
+            label, new_size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+            align_corners=align_corners)
+      new_tensor_list.append(resized_label)
+    else:
+      new_tensor_list.append(None)
+    return new_tensor_list
+
+
+def resize_stack_to_range(image,
+                    label=None,
+                    min_size=None,
+                    max_size=None,
+                    factor=None,
+                    align_corners=True,
+                    label_layout_is_chw=False,
+                    scope=None,
+                    method=tf.image.ResizeMethod.BILINEAR):
+  """Resizes image or label so their sides are within the provided range.
+
+  The output size can be described by two cases:
+  1. If the image can be rescaled so its minimum size is equal to min_size
+     without the other side exceeding max_size, then do so.
+  2. Otherwise, resize so the largest side is equal to max_size.
+
+  An integer in `range(factor)` is added to the computed sides so that the
+  final dimensions are multiples of `factor` plus one.
+
+  Args:
+    image: A 3D tensor of shape [height, width, channels].
+    label: (optional) A 3D tensor of shape [height, width, channels] (default)
+      or [channels, height, width] when label_layout_is_chw = True.
+    min_size: (scalar) desired size of the smaller image side.
+    max_size: (scalar) maximum allowed size of the larger image side. Note
+      that the output dimension is no larger than max_size and may be slightly
+      smaller than min_size when factor is not None.
+    factor: Make output size multiple of factor plus one.
+    align_corners: If True, exactly align all 4 corners of input and output.
+    label_layout_is_chw: If true, the label has shape [channel, height, width].
+      We support this case because for some instance segmentation dataset, the
+      instance segmentation is saved as [num_instances, height, width].
+    scope: Optional name scope.
+    method: Image resize method. Defaults to tf.image.ResizeMethod.BILINEAR.
+
+  Returns:
+    A 3-D tensor of shape [new_height, new_width, channels], where the image
+    has been resized (with the specified method) so that
+    min(new_height, new_width) == ceil(min_size) or
+    max(new_height, new_width) == ceil(max_size).
+
+  Raises:
+    ValueError: If the image is not a 3D tensor.
+  """
+  with tf.name_scope(scope, 'resize_to_range', [image]):
+    new_tensor_list = []
+    min_size = tf.to_float(min_size)
+    if max_size is not None:
+      max_size = tf.to_float(max_size)
+      # Modify the max_size to be a multiple of factor plus 1 and make sure the
+      # max dimension after resizing is no larger than max_size.
+      if factor is not None:
+        max_size = (max_size + (factor - (max_size - 1) % factor) % factor
+                    - factor)
+
+    [orig_depth, orig_height, orig_width, _] = resolve_shape(image, rank=4)
+    orig_depth = tf.to_float(orig_depth)
+    orig_height = tf.to_float(orig_height)
+    orig_width = tf.to_float(orig_width)
+    orig_min_size = tf.minimum(orig_height, orig_width)
+
+    # Calculate the larger of the possible sizes
+    large_scale_factor = min_size / orig_min_size
+    large_height = tf.to_int32(tf.ceil(orig_height * large_scale_factor))
+    large_width = tf.to_int32(tf.ceil(orig_width * large_scale_factor))
+    large_size = tf.stack([large_height, large_width])
+
+    new_size = large_size
+    if max_size is not None:
+      # Calculate the smaller of the possible sizes, use that if the larger
+      # is too big.
+      orig_max_size = tf.maximum(orig_height, orig_width)
+      small_scale_factor = max_size / orig_max_size
+      small_height = tf.to_int32(tf.ceil(orig_height * small_scale_factor))
+      small_width = tf.to_int32(tf.ceil(orig_width * small_scale_factor))
+      small_size = tf.stack([small_height, small_width])
+      new_size = tf.cond(
+          tf.to_float(tf.reduce_max(large_size)) > max_size,
+          lambda: small_size,
+          lambda: large_size)
+    # Ensure that both output sides are multiples of factor plus one.
+    if factor is not None:
+      new_size += (factor - (new_size - 1) % factor) % factor
+    new_tensor_list.append(tf.image.resize_images(
+        image, new_size, method=method, align_corners=align_corners))
+    if label is not None:
+      if label_layout_is_chw:
+        # Input label has shape [channel, height, width].
+        resized_label = tf.expand_dims(label, 4)
+        resized_label = tf.image.resize_nearest_neighbor(
+            resized_label, new_size, align_corners=align_corners)
+        resized_label = tf.squeeze(resized_label, 4)
       else:
         # Input label has shape [height, width, channel].
         resized_label = tf.image.resize_images(

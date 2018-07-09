@@ -16,8 +16,13 @@
 
 import os
 import tensorflow as tf
-
 from tensorflow.python.tools import freeze_graph
+#import os
+#os.sys.path.append('./deeplab')
+#import common
+#import input_preprocess
+#import model
+
 from deeplab import common
 from deeplab import input_preprocess
 from deeplab import model
@@ -80,9 +85,9 @@ def _create_input_tensors():
   # Squeeze the dimension in axis=0 since `preprocess_image_and_label` assumes
   # image to be 3-D.
   image = tf.squeeze(input_image, axis=0)
-  resized_image, image, _ = input_preprocess.preprocess_image_and_label(
+  resized_image, image, _  = input_preprocess.preprocess_image_and_label(
       image,
-      label=None,
+      label=None, 
       crop_height=FLAGS.crop_size[0],
       crop_width=FLAGS.crop_size[1],
       min_resize_value=FLAGS.min_resize_value,
@@ -103,8 +108,9 @@ def main(unused_argv):
   tf.logging.set_verbosity(tf.logging.INFO)
   tf.logging.info('Prepare to export model to: %s', FLAGS.export_path)
 
+
   with tf.Graph().as_default():
-    image, image_size, resized_image_size = _create_input_tensors()
+    image, image_size, resized_image_size  = _create_input_tensors()
 
     model_options = common.ModelOptions(
         outputs_to_num_classes={common.OUTPUT_TYPE: FLAGS.num_classes},
@@ -143,6 +149,7 @@ def main(unused_argv):
       return tf.squeeze(resized_label, 3)
     semantic_predictions = _resize_label(semantic_predictions, image_size)
     semantic_predictions = tf.identity(semantic_predictions, name=_OUTPUT_NAME)
+
 
     saver = tf.train.Saver(tf.model_variables())
 

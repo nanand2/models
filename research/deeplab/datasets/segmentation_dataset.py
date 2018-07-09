@@ -108,10 +108,58 @@ _ADE20K_INFORMATION = DatasetDescriptor(
 )
 
 
+_MRI_INFORMATION = DatasetDescriptor(
+    splits_to_sizes={
+        'train': 2500000, #20210,  # num of samples in images/training
+        'val': 64525,  # num of samples in images/validation
+    },
+    num_classes=21,
+    ignore_label=255,
+)
+
+
+_MRI_SAG_INFORMATION = DatasetDescriptor(
+    splits_to_sizes={
+        'train': 113871, #141564 #20210,  # num of samples in images/training
+        'val': 3524,  # num of samples in images/validation
+    },
+    num_classes=21,
+    ignore_label=255,
+)
+
+
+_MRI_TRANS_INFORMATION = DatasetDescriptor(
+    splits_to_sizes={
+        'train': 155395,
+        'val': 2559,  # num of samples in images/validation
+    },
+    num_classes=21,
+    ignore_label=255,
+)
+
+
+_MRI_MR_TRANS_INFORMATION = DatasetDescriptor(
+    splits_to_sizes={
+        'train': 288, #141564 #20210,  # num of samples in images/training
+        'val': 48,  # num of samples in images/validation
+    },
+    num_classes=21,
+    ignore_label=255,
+)
+
+
+
+
 _DATASETS_INFORMATION = {
     'cityscapes': _CITYSCAPES_INFORMATION,
     'pascal_voc_seg': _PASCAL_VOC_SEG_INFORMATION,
     'ade20k': _ADE20K_INFORMATION,
+    'mri': _MRI_INFORMATION,
+    'mri_sag': _MRI_SAG_INFORMATION,
+    'mri_trans': _MRI_TRANS_INFORMATION,
+    'mri_mr_trans': _MRI_MR_TRANS_INFORMATION,
+
+
 }
 
 # Default file pattern of TFRecord of TensorFlow Example.
@@ -167,6 +215,10 @@ def get_dataset(dataset_name, split_name, dataset_dir):
           (), tf.string, default_value=''),
       'image/segmentation/class/format': tf.FixedLenFeature(
           (), tf.string, default_value='png'),
+      'image/label/class/encoded': tf.FixedLenFeature(
+          (), tf.string, default_value=''),
+      'image/label/class/format':  tf.FixedLenFeature(
+          (), tf.string, default_value='png'),
   }
   items_to_handlers = {
       'image': tfexample_decoder.Image(
@@ -180,6 +232,12 @@ def get_dataset(dataset_name, split_name, dataset_dir):
           image_key='image/segmentation/class/encoded',
           format_key='image/segmentation/class/format',
           channels=1),
+      'class_label': tfexample_decoder.Image(
+          image_key='image/label/class/encoded',
+          format_key='image/label/class/format',
+          channels=1),
+
+
   }
 
   decoder = tfexample_decoder.TFExampleDecoder(

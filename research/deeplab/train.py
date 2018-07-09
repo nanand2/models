@@ -58,16 +58,16 @@ flags.DEFINE_integer('task', 0, 'The task ID.')
 flags.DEFINE_string('train_logdir', None,
                     'Where the checkpoint and logs are stored.')
 
-flags.DEFINE_integer('log_steps', 10,
+flags.DEFINE_integer('log_steps', 1,
                      'Display logging information at every log_steps.')
 
 flags.DEFINE_integer('save_interval_secs', 1200,
                      'How often, in seconds, we save the model to disk.')
 
-flags.DEFINE_integer('save_summaries_secs', 600,
+flags.DEFINE_integer('save_summaries_secs', 15,
                      'How often, in seconds, we compute the summaries.')
 
-flags.DEFINE_boolean('save_summaries_images', False,
+flags.DEFINE_boolean('save_summaries_images', True,
                      'Save sample inputs, labels, and semantic predictions as '
                      'images to summary.')
 
@@ -101,6 +101,8 @@ flags.DEFINE_float('momentum', 0.9, 'The momentum value to use')
 flags.DEFINE_integer('train_batch_size', 8,
                      'The number of images in each batch during training.')
 
+# For weight_decay, use 0.00004 for MobileNet-V2 or Xcpetion model variants.
+# Use 0.0001 for ResNet model variants.
 flags.DEFINE_float('weight_decay', 0.00004,
                    'The value of the weight decay for training.')
 
@@ -137,10 +139,10 @@ flags.DEFINE_float('slow_start_learning_rate', 1e-4,
 flags.DEFINE_boolean('fine_tune_batch_norm', True,
                      'Fine tune the batch norm parameters or not.')
 
-flags.DEFINE_float('min_scale_factor', 0.5,
+flags.DEFINE_float('min_scale_factor', 1.,
                    'Mininum scale factor for data augmentation.')
 
-flags.DEFINE_float('max_scale_factor', 2.,
+flags.DEFINE_float('max_scale_factor', 1.,
                    'Maximum scale factor for data augmentation.')
 
 flags.DEFINE_float('scale_factor_step_size', 0.25,
@@ -206,8 +208,8 @@ def _build_deeplab(inputs_queue, outputs_to_num_classes, ignore_label):
 
   # Add name to graph node so we can add to summary.
   output_type_dict = outputs_to_scales_to_logits[common.OUTPUT_TYPE]
-  output_type_dict[model.get_merged_logits_scope()] = tf.identity(
-      output_type_dict[model.get_merged_logits_scope()],
+  output_type_dict[model.MERGED_LOGITS_SCOPE] = tf.identity(
+      output_type_dict[model.MERGED_LOGITS_SCOPE],
       name=common.OUTPUT_TYPE)
 
   for output, num_classes in six.iteritems(outputs_to_num_classes):

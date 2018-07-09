@@ -146,6 +146,7 @@ def _convert_dataset(dataset_split):
     shard_filename = '%s-%05d-of-%05d.tfrecord' % (
         dataset_split, shard_id, _NUM_SHARDS)
     output_filename = os.path.join(FLAGS.output_dir, shard_filename)
+    print(output_filename)
     with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
       start_idx = shard_id * num_per_shard
       end_idx = min((shard_id + 1) * num_per_shard, num_images)

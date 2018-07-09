@@ -159,3 +159,130 @@ def image_seg_to_tfexample(image_data, filename, height, width, seg_data):
       'image/segmentation/class/format': _bytes_list_feature(
           FLAGS.label_format),
   }))
+
+def image_seg_label_to_tfexample(image_data, filename, height, width, seg_data, label_data):
+  """Converts one image/segmentation pair to tf example.
+
+  Args:
+    image_data: string of image data.
+    filename: image filename.
+    height: image height.
+    width: image width.
+    seg_data: string of semantic segmentation data.
+    label: string of class label data
+
+  Returns:
+    tf example of one image/segmentation/label tuple.
+  """
+  return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': _bytes_list_feature(image_data),
+      'image/filename': _bytes_list_feature(filename),
+      'image/format': _bytes_list_feature(
+          _IMAGE_FORMAT_MAP[FLAGS.image_format]),
+      'image/height': _int64_list_feature(height),
+      'image/width': _int64_list_feature(width),
+      'image/channels': _int64_list_feature(3),
+      'image/segmentation/class/encoded': (_bytes_list_feature(seg_data)),
+      'image/segmentation/class/format': _bytes_list_feature(
+          FLAGS.label_format),
+      'image/label/class/encoded': (_bytes_list_feature(label_data)),
+      'image/label/class/format': _bytes_list_feature(
+          FLAGS.label_format),
+  }))
+
+def image_only_label_to_tfexample(image_data, filename, height, width, label_data, cdr_data):
+  """Converts one image/segmentation pair to tf example.
+
+  Args:
+    image_data: string of image data.
+    filename: image filename.
+    height: image height.
+    width: image width.
+    seg_data: string of semantic segmentation data.
+    label: string of class label data
+
+  Returns:
+    tf example of one image/segmentation/label tuple.
+  """
+  return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': _bytes_list_feature(image_data),
+      'image/filename': _bytes_list_feature(filename),
+      'image/format': _bytes_list_feature(
+          _IMAGE_FORMAT_MAP[FLAGS.image_format]),
+      'image/height': _int64_list_feature(height),
+      'image/width': _int64_list_feature(width),
+      'image/channels': _int64_list_feature(3),
+      'image/label/class/encoded': _int64_list_feature(label_data),
+      'image/cdr/class/encoded': _int64_list_feature(cdr_data),
+
+  }))
+
+def image_label_to_tfexample(image_data, seg_data,  filename, height, width, label_data, cdr_data):
+  """Converts one image/segmentation pair to tf example.
+
+  Args:
+    image_data: string of image data.
+    filename: image filename.
+    height: image height.
+    width: image width.
+    seg_data: string of semantic segmentation data.
+    label: string of class label data
+
+  Returns:
+    tf example of one image/segmentation/label tuple.
+  """
+  return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': _bytes_list_feature(image_data),
+      'image/filename': _bytes_list_feature(filename),
+      'image/format': _bytes_list_feature(
+          _IMAGE_FORMAT_MAP[FLAGS.image_format]),
+      'image/height': _int64_list_feature(height),
+      'image/width': _int64_list_feature(width),
+      'image/channels': _int64_list_feature(3),
+      'image/segmentation/class/encoded': (_bytes_list_feature(seg_data)),
+      'image/segmentation/class/format': _bytes_list_feature(
+          FLAGS.label_format),
+      'image/label/class/encoded': _int64_list_feature(label_data),
+      'image/cdr/class/encoded': _int64_list_feature(cdr_data),
+
+  }))
+
+def image_mask_label_to_tfexample(image_data, seg_data, mask_data, mask_seg_data, filename, height, width, label_data, cdr_data):
+  """Converts one image/segmentation pair to tf example.
+
+  Args:
+    image_data: string of image data.
+    filename: image filename.
+    height: image height.
+    width: image width.
+    seg_data: string of semantic segmentation data.
+    label: string of class label data
+
+  Returns:
+    tf example of one image/segmentation/label tuple.
+  """
+  return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': _bytes_list_feature(image_data),
+      'image/filename': _bytes_list_feature(filename),
+      'image/format': _bytes_list_feature(
+          _IMAGE_FORMAT_MAP[FLAGS.image_format]),
+      'image/height': _int64_list_feature(height),
+      'image/width': _int64_list_feature(width),
+      'image/channels': _int64_list_feature(3),
+      'image/segmentation/class/encoded': (_bytes_list_feature(seg_data)),
+      'image/segmentation/class/format': _bytes_list_feature(
+          FLAGS.label_format),
+      'image/label/class/encoded': _int64_list_feature(label_data),
+      'image/cdr/class/encoded': _int64_list_feature(cdr_data),
+      'mask_image/mask_segmentation/class/encoded': (_bytes_list_feature(mask_seg_data)),
+      'mask_image/mask_segmentation/class/format': _bytes_list_feature(
+          FLAGS.label_format),
+      'mask_image/encoded': _bytes_list_feature(mask_data),
+      'mask_image/filename': _bytes_list_feature(filename),
+      'mask_image/format': _bytes_list_feature(
+          _IMAGE_FORMAT_MAP[FLAGS.image_format]),
+
+  }))
+
+
+

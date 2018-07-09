@@ -22,8 +22,8 @@ import six
 import tensorflow as tf
 from deeplab import common
 from deeplab import model
-from deeplab.datasets import segmentation_dataset
-from deeplab.utils import input_generator
+from deeplab.datasets import segmentation_label_dataset
+from deeplab.utils import input_label_generator
 
 slim = tf.contrib.slim
 
@@ -85,14 +85,14 @@ flags.DEFINE_integer('max_number_of_evaluations', 0,
 def main(unused_argv):
   tf.logging.set_verbosity(tf.logging.INFO)
   # Get dataset-dependent information.
-  dataset = segmentation_dataset.get_dataset(
+  dataset = segmentation_label_dataset.get_dataset(
       FLAGS.dataset, FLAGS.eval_split, dataset_dir=FLAGS.dataset_dir)
 
   tf.gfile.MakeDirs(FLAGS.eval_logdir)
   tf.logging.info('Evaluating on %s set', FLAGS.eval_split)
 
   with tf.Graph().as_default():
-    samples = input_generator.get(
+    samples = input_label_generator.get(
         dataset,
         FLAGS.eval_crop_size,
         FLAGS.eval_batch_size,
@@ -149,8 +149,8 @@ def main(unused_argv):
       slim.summaries.add_scalar_summary(
           metric_value, metric_name, print_summary=True)
 
-    num_batches = int(
-        math.ceil(dataset.num_samples / float(FLAGS.eval_batch_size)))
+    num_batches = 1000 #int(
+        #math.ceil(dataset.num_samples / float(FLAGS.eval_batch_size)))
 
     tf.logging.info('Eval num images %d', dataset.num_samples)
     tf.logging.info('Eval batch size %d and num batch %d',

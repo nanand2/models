@@ -82,6 +82,7 @@ FLAGS = flags.FLAGS
 
 # Perform semantic segmentation predictions.
 OUTPUT_TYPE = 'semantic'
+DISC_OUTPUT_TYPE = 'disc'
 
 # Semantic segmentation item names.
 LABELS_CLASS = 'labels_class'
@@ -91,6 +92,10 @@ WIDTH = 'width'
 IMAGE_NAME = 'image_name'
 LABEL = 'label'
 ORIGINAL_IMAGE = 'original_image'
+CLASS_LABEL = 'class_label'
+CDR_LABEL = 'cdr_label'
+
+FEATURE = 'feature'
 
 # Test set name.
 TEST_SET = 'test'

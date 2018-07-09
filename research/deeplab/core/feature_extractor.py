@@ -212,7 +212,7 @@ def extract_features(images,
                      preprocess_images=True,
                      num_classes=None,
                      global_pool=False,
-                     use_bounded_activations=False):
+                     use_bounded_activations=False, trainable=True):
   """Extracts features by the particular model_variant.
 
   Args:
