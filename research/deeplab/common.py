@@ -83,7 +83,7 @@ FLAGS = flags.FLAGS
 # Perform semantic segmentation predictions.
 OUTPUT_TYPE = 'semantic'
 DISC_OUTPUT_TYPE = 'disc'
-
+CDR_DISC_OUTPUT_TYPE = 'cdr_disc'
 # Semantic segmentation item names.
 LABELS_CLASS = 'labels_class'
 IMAGE = 'image'

@@ -18,6 +18,7 @@ See model.py for more details and usage.
 """
 
 import math
+import numpy as np
 import six
 import tensorflow as tf
 from deeplab import common
@@ -30,6 +31,12 @@ slim = tf.contrib.slim
 flags = tf.app.flags
 
 FLAGS = flags.FLAGS
+
+
+
+flags.DEFINE_integer('num_classes', 21,
+                     'The number of classes to evaluate.')
+
 
 flags.DEFINE_string('master', '', 'BNS name of the tensorflow server')
 
@@ -121,15 +128,21 @@ def main(unused_argv):
           eval_scales=FLAGS.eval_scales,
           add_flipped_images=FLAGS.add_flipped_images)
     predictions = predictions[common.OUTPUT_TYPE]
+
+
+
     predictions = tf.reshape(predictions, shape=[-1])
     labels = tf.reshape(samples[common.LABEL], shape=[-1])
-    weights = tf.to_float(tf.not_equal(labels, dataset.ignore_label))
+    weights = tf.to_float(tf.logical_and(tf.not_equal(labels, dataset.ignore_label), tf.less(predictions, FLAGS.num_classes)))
+
 
     # Set ignore_label regions to label 0, because metrics.mean_iou requires
     # range of labels = [0, dataset.num_classes). Note the ignore_label regions
     # are not evaluated since the corresponding regions contain weights = 0.
-    labels = tf.where(
+    new_labels = tf.where(
         tf.equal(labels, dataset.ignore_label), tf.zeros_like(labels), labels)
+    new_labels = tf.where(
+        tf.greater(new_labels, FLAGS.num_classes-1), tf.zeros_like(new_labels), new_labels)
 
     predictions_tag = 'miou'
     for eval_scale in FLAGS.eval_scales:
@@ -139,8 +152,10 @@ def main(unused_argv):
 
     # Define the evaluation metric.
     metric_map = {}
-    metric_map[predictions_tag] = tf.metrics.mean_iou(
-        predictions, labels, dataset.num_classes, weights=weights)
+    metric_map[predictions_tag]  = tf.metrics.mean_iou( predictions, new_labels, FLAGS.num_classes, weights=weights, dice=True)
+    for i in range(14):
+        weights = tf.to_float(tf.logical_and(tf.logical_and(tf.logical_or( tf.equal(labels, i), tf.equal(predictions, i)), tf.not_equal(labels, dataset.ignore_label)), tf.less(predictions, FLAGS.num_classes))) #weight if label or prediction is class of interest and label is not the ignore class and predictions are one of the actual classes
+        metric_map[predictions_tag + '_' + str(i)]  = tf.metrics.mean_iou(predictions, new_labels, FLAGS.num_classes, weights=weights, idx=i, dice=True)
 
     metrics_to_values, metrics_to_updates = (
         tf.contrib.metrics.aggregate_metric_map(metric_map))
@@ -149,8 +164,7 @@ def main(unused_argv):
       slim.summaries.add_scalar_summary(
           metric_value, metric_name, print_summary=True)
 
-    num_batches = 1000 #int(
-        #math.ceil(dataset.num_samples / float(FLAGS.eval_batch_size)))
+    num_batches = int(math.ceil(dataset.num_samples / float(FLAGS.eval_batch_size))) -1 
 
     tf.logging.info('Eval num images %d', dataset.num_samples)
     tf.logging.info('Eval batch size %d and num batch %d',
@@ -159,6 +173,7 @@ def main(unused_argv):
     num_eval_iters = None
     if FLAGS.max_number_of_evaluations > 0:
       num_eval_iters = FLAGS.max_number_of_evaluations
+    session_config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False, gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.45))
     slim.evaluation.evaluation_loop(
         master=FLAGS.master,
         checkpoint_dir=FLAGS.checkpoint_dir,
@@ -166,7 +181,11 @@ def main(unused_argv):
         num_evals=num_batches,
         eval_op=list(metrics_to_updates.values()),
         max_number_of_evaluations=num_eval_iters,
-        eval_interval_secs=FLAGS.eval_interval_secs)
+        eval_interval_secs=FLAGS.eval_interval_secs, session_config=session_config)
+
+
+
+
 
 
 if __name__ == '__main__':

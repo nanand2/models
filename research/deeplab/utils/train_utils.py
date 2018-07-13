@@ -110,7 +110,7 @@ def get_model_init_fn(train_logdir,
   return slim.assign_from_checkpoint_fn(
       tf_initial_checkpoint,
       variables_to_restore,
-      ignore_missing_vars=ignore_missing_vars)
+      ignore_missing_vars=True)#ignore_missing_vars)
 
 
 def get_model_gradient_multipliers(last_layers, last_layer_gradient_multiplier):

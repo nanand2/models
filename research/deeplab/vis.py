@@ -24,8 +24,8 @@ import numpy as np
 import tensorflow as tf
 from deeplab import common
 from deeplab import model
-from deeplab.datasets import segmentation_dataset
-from deeplab.utils import input_generator
+from deeplab.datasets import segmentation_label_dataset
+from deeplab.utils import input_label_generator
 from deeplab.utils import save_annotation
 
 slim = tf.contrib.slim
@@ -92,13 +92,14 @@ flags.DEFINE_integer('max_number_of_iterations', 0,
 
 # The folder where semantic segmentation predictions are saved.
 _SEMANTIC_PREDICTION_SAVE_FOLDER = 'segmentation_results'
+_LABEL_SAVE_FOLDER = 'labels'
 
 # The folder where raw semantic segmentation predictions are saved.
 _RAW_SEMANTIC_PREDICTION_SAVE_FOLDER = 'raw_segmentation_results'
 
 # The format to save image.
 _IMAGE_FORMAT = '%06d_image'
-
+_LABEL_FORMAT =  '%06d_label'
 # The format to save prediction
 _PREDICTION_FORMAT = '%06d_prediction'
 
@@ -129,7 +130,7 @@ def _convert_train_id_to_eval_id(prediction, train_id_to_eval_id):
   return converted_prediction
 
 
-def _process_batch(sess, original_images, semantic_predictions, image_names,
+def _process_batch(sess, original_images, labels, semantic_predictions, image_names,
                    image_heights, image_widths, image_id_offset, save_dir,
                    raw_save_dir, train_id_to_eval_id=None):
   """Evaluates one single batch qualitatively.
@@ -146,11 +147,11 @@ def _process_batch(sess, original_images, semantic_predictions, image_names,
     raw_save_dir: The directory where the raw predictions will be saved.
     train_id_to_eval_id: A list mapping from train id to eval id.
   """
-  (original_images,
+  (original_images, labels,
    semantic_predictions,
    image_names,
    image_heights,
-   image_widths) = sess.run([original_images, semantic_predictions,
+   image_widths) = sess.run([original_images, labels, semantic_predictions,
                              image_names, image_heights, image_widths])
 
   num_image = semantic_predictions.shape[0]
@@ -158,6 +159,7 @@ def _process_batch(sess, original_images, semantic_predictions, image_names,
     image_height = np.squeeze(image_heights[i])
     image_width = np.squeeze(image_widths[i])
     original_image = np.squeeze(original_images[i])
+    label = np.squeeze(labels[i])
     semantic_prediction = np.squeeze(semantic_predictions[i])
     crop_semantic_prediction = semantic_prediction[:image_height, :image_width]
 
@@ -165,6 +167,12 @@ def _process_batch(sess, original_images, semantic_predictions, image_names,
     save_annotation.save_annotation(
         original_image, save_dir, _IMAGE_FORMAT % (image_id_offset + i),
         add_colormap=False)
+
+    # Save label.
+    save_annotation.save_annotation(
+        label, save_dir, _LABEL_FORMAT % (image_id_offset + i),
+        add_colormap=True,
+        colormap_type=FLAGS.colormap_type) #add_colormap=False)
 
     # Save prediction.
     save_annotation.save_annotation(
@@ -187,16 +195,18 @@ def _process_batch(sess, original_images, semantic_predictions, image_names,
 def main(unused_argv):
   tf.logging.set_verbosity(tf.logging.INFO)
   # Get dataset-dependent information.
-  dataset = segmentation_dataset.get_dataset(
+  dataset = segmentation_label_dataset.get_dataset(
       FLAGS.dataset, FLAGS.vis_split, dataset_dir=FLAGS.dataset_dir)
   train_id_to_eval_id = None
-  if dataset.name == segmentation_dataset.get_cityscapes_dataset_name():
+  if dataset.name == segmentation_label_dataset.get_cityscapes_dataset_name():
     tf.logging.info('Cityscapes requires converting train_id to eval_id.')
     train_id_to_eval_id = _CITYSCAPES_TRAIN_ID_TO_EVAL_ID
 
   # Prepare for visualization.
   tf.gfile.MakeDirs(FLAGS.vis_logdir)
   save_dir = os.path.join(FLAGS.vis_logdir, _SEMANTIC_PREDICTION_SAVE_FOLDER)
+  label_save_dir = os.path.join(FLAGS.vis_logdir, _LABEL_SAVE_FOLDER)
+
   tf.gfile.MakeDirs(save_dir)
   raw_save_dir = os.path.join(
       FLAGS.vis_logdir, _RAW_SEMANTIC_PREDICTION_SAVE_FOLDER)
@@ -206,7 +216,7 @@ def main(unused_argv):
 
   g = tf.Graph()
   with g.as_default():
-    samples = input_generator.get(dataset,
+    samples = input_label_generator.get(dataset,
                                   FLAGS.vis_crop_size,
                                   FLAGS.vis_batch_size,
                                   min_resize_value=FLAGS.min_resize_value,
@@ -246,6 +256,8 @@ def main(unused_argv):
       # First, we slice the valid regions (i.e., remove padded region) and then
       # we reisze the predictions back.
       original_image = tf.squeeze(samples[common.ORIGINAL_IMAGE])
+      label = tf.squeeze(samples[common.LABEL])
+ 
       original_image_shape = tf.shape(original_image)
       predictions = tf.slice(
           predictions,
@@ -259,6 +271,8 @@ def main(unused_argv):
                                  method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
                                  align_corners=True), 3)
 
+
+
     tf.train.get_or_create_global_step()
     saver = tf.train.Saver(slim.get_variables_to_restore())
     sv = tf.train.Supervisor(graph=g,
@@ -268,8 +282,8 @@ def main(unused_argv):
                              summary_writer=None,
                              global_step=None,
                              saver=saver)
-    num_batches = int(math.ceil(
-        dataset.num_samples / float(FLAGS.vis_batch_size)))
+    num_batches = 500 #int(math.ceil(
+        #dataset.num_samples / float(FLAGS.vis_batch_size)))
     last_checkpoint = None
 
     # Loop to visualize the results when new checkpoint is created.
@@ -295,6 +309,7 @@ def main(unused_argv):
           tf.logging.info('Visualizing batch %d / %d', batch + 1, num_batches)
           _process_batch(sess=sess,
                          original_images=samples[common.ORIGINAL_IMAGE],
+                         labels=samples[common.LABEL],
                          semantic_predictions=predictions,
                          image_names=samples[common.IMAGE_NAME],
                          image_heights=samples[common.HEIGHT],
